@@ -24,7 +24,7 @@ const VOICES = {
     '结尾给一个今天就能做完的小动作，不说教，不喊口号。',
   ].join('\n'),
   plain: [
-    '语气：机械。像一份运行报告，只陈述：完成项、未完成项、偏差、剩余天数。',
+    '语气：机械。像一份运行报告，只陈述：完成项、未完成项、偏差。',
     '陈述句，不带情绪词，不评价人，不给鼓励。',
   ].join('\n'),
   custom: '',
@@ -56,7 +56,7 @@ export async function composeDiary(ctx, { date, notes, current, warn }) {
   if (current.trim() !== '') parts.push('已有的一页，把新素材并进去、保留原有事实：\n' + clip(current.trim(), 8_000))
   parts.push('她说的：\n' + clip(notes.trim(), 12_000))
   const text = parts.join('\n\n')
-  return askOnce(ctx, { system: DIARY_SYSTEM, text, maxTokens: 2_048, warn })
+  return askOnce(ctx, { system: DIARY_SYSTEM, text, maxTokens: 4_096, warn })
 }
 
 /**
