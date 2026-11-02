@@ -1,16 +1,17 @@
 // dsh-sidebar-memo — host half.
 //
 // The store (host/store.js) owns the files, the two tools (host/tools.js) are
-// what the model writes with, the notepad upload (host/notebook.js) is what only
-// the panel may call, and this file wires them to the harness: one short prompt
-// section, two tools, and the panel's routes under api/dsh-memo.
+// what the model writes with, the prompts (host/scribe.js) turn the user's own
+// words into her diary and a goal into a critique, and this file wires them to
+// the harness: one short prompt section, two tools, the panel's routes under
+// api/dsh-memo, and the two background writes the panel asks for.
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createStore, isDate, today } from './host/store.js'
 import { createTools } from './host/tools.js'
-import { NOTEBOOKS, cleanPadId, uploadDiary } from './host/notebook.js'
+import { composeDiary, composeReview } from './host/scribe.js'
 
 const ROUTE_BASE = '/api/dsh-memo'
 /** The panel stylesheet ships as a real file and is served to the browser half. */
@@ -20,8 +21,9 @@ const AVATAR_FILE = join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', '
 
 const MEMO_SECTION = [
   '## 备忘录',
-  '右侧边栏的「备忘录」放着用户的待办清单和每日日记，两个工具读写它：memo 管待办，diary 管日记。',
-  '用户说要记的事，直接写进去，不用再问一遍。日记只留在本地；上传到 note.ms / getnote.top 由用户在界面上自己点，你不主动上传，也不提议代劳。',
+  '右侧边栏的「备忘录」有两页：清单和目标。目标是用户自己立下的，记着期限、进度和复盘；它和会话里的 Goal 工具不是一回事，别用 create_goal 去改她的目标。',
+  'memo 管待办，也读写目标（goal 参数）；op=read 同时列出待办与目标。日记在目标页里：她口述今天做了什么，你用她的第一人称写成日记，素材里有什么写什么，不编细节。面板自己也会写，别把已经写好的整页重写一遍。',
+  '用户说要记的事，直接写进去，不用再问。',
 ].join('\n')
 
 function writeJson(res, status, value) {
@@ -67,6 +69,65 @@ export function apply(ctx, config) {
   const store = createStore({ root: dataDir, warn })
   const tools = createTools({ store })
 
+  // What the panel asked for and the model is still working on.
+  const jobs = {
+    diary: { date: '', running: false, error: '', at: 0 },
+    review: { id: '', running: false, error: '', at: 0 },
+  }
+  let chain = Promise.resolve()
+
+  function runInBackground(task) {
+    const next = chain.then(task, task)
+    chain = next.then(() => {}, () => {})
+    return next
+  }
+
+  /** Write today's page from the notes the panel just saved. */
+  function writeDiaryNow(date) {
+    jobs.diary = { date, running: true, error: '', at: Date.now() }
+    return runInBackground(async () => {
+      try {
+        const notes = await store.readRaw(date)
+        if (notes.trim() === '') throw new Error('这一天还没有口述')
+        const current = await store.readDiary(date)
+        const text = await composeDiary(ctx, { date, notes, current, warn })
+        await store.writeDiary(date, text, 'replace')
+        jobs.diary = { date, running: false, error: '', at: Date.now() }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        jobs.diary = { date, running: false, error: message, at: Date.now() }
+        warn('dsh-sidebar-memo: diary write failed: ' + message)
+      }
+    })
+  }
+
+  /** Read the goal against the days since it was set and store the critique. */
+  function reviewGoalNow(id) {
+    jobs.review = { id: String(id ?? ''), running: true, error: '', at: Date.now() }
+    return runInBackground(async () => {
+      let goalId = ''
+      try {
+        const goal = await store.findGoal(id)
+        goalId = goal.id
+        const snapshot = await store.state()
+        const pages = await store.diaryBetween(goal.since, today(), 14_000)
+        const text = await composeReview(ctx, {
+          goal,
+          pages,
+          mood: snapshot.mood,
+          custom: snapshot.custom,
+          warn,
+        })
+        await store.reviewGoal(goal.id, { text, mode: snapshot.mood })
+        jobs.review = { id: goal.id, running: false, error: '', at: Date.now() }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        jobs.review = { id: goalId, running: false, error: message, at: Date.now() }
+        warn('dsh-sidebar-memo: goal review failed: ' + message)
+      }
+    })
+  }
+
   ctx.inject(['systemPrompt'], (scope) => {
     scope.effect(() => scope.systemPrompt.section({
       name: 'sidebar-memo',
@@ -86,6 +147,8 @@ export function apply(ctx, config) {
 
   ctx.inject(['webServer'], (scope) => {
     scope.effect(() => {
+      const state = async (date) => ({ ...(await store.state(date)), jobs })
+
       const post = (path, run) => ({
         kind: 'exact',
         path: ROUTE_BASE + path,
@@ -143,7 +206,7 @@ export function apply(ctx, config) {
               try {
                 const url = new URL(req.url ?? '/', 'http://x')
                 const date = url.searchParams.get('date') ?? ''
-                writeJson(res, 200, { ok: true, ...(await store.state(isDate(date) ? date : today())) })
+                writeJson(res, 200, { ok: true, ...(await state(isDate(date) ? date : today())) })
               } catch (error) {
                 writeJson(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) })
               }
@@ -154,44 +217,82 @@ export function apply(ctx, config) {
           const op = String(body?.op ?? '')
           if (op === 'add') {
             const item = await store.addTodo({ text: body?.text, note: body?.note, steps: body?.steps, by: 'user' })
-            return { item, ...(await store.state(body?.date)) }
+            return { item, ...(await state(body?.date)) }
+          }
+          if (op === 'edit') {
+            const patch = {}
+            if (body?.text !== undefined) patch.text = body.text
+            if (body?.note !== undefined) patch.note = body.note
+            if (body?.steps !== undefined) patch.steps = body.steps
+            if (Object.keys(patch).length === 0) throw new Error('edit 至少要给出 text、note、steps 其中一项')
+            const item = await store.updateTodo(String(body?.id ?? ''), patch, 'user')
+            return { item, ...(await state(body?.date)) }
           }
           if (op === 'toggle') {
             await store.setTodoDone(String(body?.id ?? ''), body?.done === true)
-            return { ...(await store.state(body?.date)) }
+            return { ...(await state(body?.date)) }
           }
           if (op === 'step') {
             await store.setStepDone(String(body?.id ?? ''), body?.index, body?.done === true)
-            return { ...(await store.state(body?.date)) }
+            return { ...(await state(body?.date)) }
           }
           if (op === 'del') {
             await store.removeTodo(String(body?.id ?? ''))
-            return { ...(await store.state(body?.date)) }
+            return { ...(await state(body?.date)) }
           }
           if (op === 'clear') {
             await store.clearDone()
-            return { ...(await store.state(body?.date)) }
+            return { ...(await state(body?.date)) }
           }
           throw new Error('未知的待办操作：' + op)
         }),
-        post('/diary', async (body) => {
+        post('/goal', async (body) => {
+          const op = String(body?.op ?? '')
+          if (op === 'set') {
+            const item = await store.saveGoal({
+              id: body?.id,
+              text: body?.text,
+              due: body?.due,
+              note: body?.note,
+            })
+            const fresh = body?.id === undefined || body?.id === ''
+            if (fresh) void reviewGoalNow(item.id)
+            return { item, ...(await state(body?.date)) }
+          }
+          if (op === 'log') {
+            const item = await store.logGoal(body?.id, body?.log)
+            return { item, ...(await state(body?.date)) }
+          }
+          if (op === 'done') {
+            const item = await store.setGoalDone(body?.id, body?.done !== false)
+            return { item, ...(await state(body?.date)) }
+          }
+          if (op === 'drop') {
+            await store.removeGoal(body?.id)
+            return { ...(await state(body?.date)) }
+          }
+          throw new Error('未知的目标操作：' + op)
+        }),
+        post('/goal/review', async (body) => {
+          const id = String(body?.id ?? '')
+          const goal = await store.findGoal(id)
+          void reviewGoalNow(goal.id)
+          return { goal: goal.id, ...(await state(body?.date)) }
+        }),
+        post('/raw', async (body) => {
           const date = isDate(body?.date) ? body.date : today()
-          await store.writeDiary(date, body?.text, 'replace')
-          return { ...(await store.state(date)) }
+          await store.appendRaw(date, body?.text)
+          void writeDiaryNow(date)
+          return { ...(await state(date)) }
         }),
-        post('/notebook', async (body) => {
-          const id = cleanPadId(body?.id)
-          await store.setNotebook({ provider: body?.provider, id })
-          return { notebook: await store.state().then(state => state.notebook) }
+        post('/diary/retry', async (body) => {
+          const date = isDate(body?.date) ? body.date : today()
+          void writeDiaryNow(date)
+          return { ...(await state(date)) }
         }),
-        post('/upload', async () => {
-          const state = await store.state()
-          const { provider, id } = state.notebook
-          if (provider === '' || id === '') throw new Error('先选好在线记事本并填上 ID')
-          const text = await store.allDiaryText()
-          if (text === '') throw new Error('日记本还是空的，没有可上传的内容')
-          const result = await uploadDiary({ provider, id, text })
-          return { upload: { ...result, provider, id, label: NOTEBOOKS[provider].label } }
+        post('/mood', async (body) => {
+          await store.setMood(body?.mood, body?.custom)
+          return { ...(await state(body?.date)) }
         }),
       ]
 

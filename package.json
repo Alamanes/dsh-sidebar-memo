@@ -2,7 +2,7 @@
   "name": "dsh-sidebar-memo",
   "version": "0.1.0",
   "private": true,
-  "description": "右侧边栏的备忘录：与模型共写的待办清单和每日日记，可上传到 note.ms / getnote.top。",
+  "description": "右侧边栏的备忘录：与模型共写的清单、目标簿，以及由 AI 代笔的日记。",
   "icon": "./icon.png",
   "keywords": [
     "dsh",
@@ -10,6 +10,7 @@
     "deepseek-harness",
     "memo",
     "todo",
+    "goal",
     "diary",
     "sidebar"
   ],
