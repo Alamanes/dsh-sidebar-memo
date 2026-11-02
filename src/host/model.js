@@ -5,8 +5,9 @@
 // Two rules, both deliberate:
 //   - no output budget: a diary page is a few hundred characters, and thinking
 //     tokens are billed against the same budget, so a cap only invents a failure;
-//   - the lowest reasoning level the model lists, never a higher one. A retry
-//     stays on that level: a bookkeeping call must not quietly start thinking.
+//   - the lowest reasoning level the model actually declares. `off` when the
+//     model lists it, otherwise `low`; a call that must not think never climbs
+//     the effort ladder on its own.
 
 const CALL_TIMEOUT_MS = 120_000
 
@@ -36,17 +37,20 @@ export function routeOf(ctx) {
   throw new Error('No model is available: add one in Harness settings.')
 }
 
-/** The quietest level this model offers, by name. */
+/** The quietest level this model declares, by name. */
 async function quietEffort(llm, route) {
   try {
-    const info = await llm.resolveModelInfo?.({ provider: route.provider, model: route.model })
-    const efforts = Array.isArray(info?.reasoning?.efforts) ? info.reasoning.efforts : []
+    const info = await llm.resolveModelInfo?.(route.provider, route.model)
+    const raw = info?.reasoning?.efforts ?? info?.reasoningEfforts
+    const ids = Array.isArray(raw)
+      ? raw.map(entry => (typeof entry === 'string' ? entry : entry?.id)).filter(id => typeof id === 'string')
+      : []
     for (const wanted of QUIET_EFFORTS) {
-      if (efforts.some(effort => effort?.id === wanted)) return wanted
+      if (ids.includes(wanted)) return wanted
     }
-    if (typeof efforts[0]?.id === 'string') return efforts[0].id
+    if (ids.length > 0) return ids[0]
   } catch { /* older host: fall through to the literal */ }
-  return 'off'
+  return 'low'
 }
 
 /** The host reports a finish reason as a string in older builds and as
@@ -73,7 +77,7 @@ function failureText(failure, finish) {
 }
 
 /**
- * Ask the model once at the given effort and return its text.
+ * Ask the model once at the quietest level and return its text.
  * @param ctx - host plugin context.
  * @param params.system - the system prompt.
  * @param params.text - the single user message.
@@ -85,7 +89,7 @@ export async function askOnce(ctx, { system, text, warn = () => {} }) {
   const route = routeOf(ctx)
   const effort = await quietEffort(llm, route)
 
-  const attempt = async () => {
+  const attempt = async (level) => {
     let reply = ''
     let finish = ''
     let failure
@@ -94,7 +98,7 @@ export async function askOnce(ctx, { system, text, warn = () => {} }) {
       model: route.model,
       system,
       messages: [{ role: 'user', content: [{ type: 'text', text }] }],
-      reasoningEffort: effort,
+      reasoningEffort: level,
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     }
     for await (const chunk of llm.stream(options)) {
@@ -110,13 +114,26 @@ export async function askOnce(ctx, { system, text, warn = () => {} }) {
     return { text: trimmed, finish: finish || (trimmed === '' ? 'no-finish' : 'stop') }
   }
 
-  const first = await attempt()
+  /** A model that does not declare the level we asked for still has a floor:
+   *  `low` is the conventional lowest non-zero effort, so fall back to it once. */
+  const atFloor = async (level) => {
+    try {
+      return await attempt(level)
+    } catch (error) {
+      const message = String(error?.message ?? '')
+      if (level !== 'low' && /does not support reasoning effort|unsupported reasoning/i.test(message)) {
+        warn('dsh-sidebar-memo: model rejected effort "' + level + '", using "low"')
+        return attempt('low')
+      }
+      throw error
+    }
+  }
+
+  const first = await atFloor(effort)
   if (first.text !== '') return first.text
 
-  // One more try at the same quiet level: an empty reply is usually a hiccup,
-  // and moving up the effort ladder is exactly what this call must not do.
   warn('dsh-sidebar-memo: the model returned no text at effort "' + effort + '" (' + first.finish + '); retrying once')
-  const second = await attempt()
+  const second = await atFloor(effort)
   if (second.text !== '') return second.text
   throw new Error('模型这次没有输出内容（' + second.finish + '，思考档 ' + effort + '）')
 }
