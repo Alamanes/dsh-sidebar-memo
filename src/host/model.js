@@ -2,15 +2,16 @@
 // the conversation uses, streamed through the host's llm service, assembled by
 // hand because a plugin does not import the harness packages.
 //
-// No output budget is set: these calls write a diary page or a short critique,
-// and thinking tokens are billed against the same budget, so an arbitrary cap
-// only creates a way to fail. The provider's own output limit is the ceiling.
-//
-// The effort starts at the lowest the model offers (efforts[0]). A model that
-// fails or answers nothing at that level is asked again at the provider default,
-// and the working level is kept for the rest of the process.
+// Two rules, both deliberate:
+//   - no output budget: a diary page is a few hundred characters, and thinking
+//     tokens are billed against the same budget, so a cap only invents a failure;
+//   - the lowest reasoning level the model lists, never a higher one. A retry
+//     stays on that level: a bookkeeping call must not quietly start thinking.
 
 const CALL_TIMEOUT_MS = 120_000
+
+/** Effort ids that mean "do not think", best first. */
+const QUIET_EFFORTS = ['off', 'none', 'disabled', 'minimal', 'low']
 
 /**
  * The provider and model a request should use: the agent's current choice, else
@@ -33,6 +34,19 @@ export function routeOf(ctx) {
   const first = providers.find(entry => Array.isArray(entry?.models) && entry.models.length > 0)
   if (first !== undefined) return { provider: first.id ?? first.provider, model: first.models[0] }
   throw new Error('No model is available: add one in Harness settings.')
+}
+
+/** The quietest level this model offers, by name. */
+async function quietEffort(llm, route) {
+  try {
+    const info = await llm.resolveModelInfo?.({ provider: route.provider, model: route.model })
+    const efforts = Array.isArray(info?.reasoning?.efforts) ? info.reasoning.efforts : []
+    for (const wanted of QUIET_EFFORTS) {
+      if (efforts.some(effort => effort?.id === wanted)) return wanted
+    }
+    if (typeof efforts[0]?.id === 'string') return efforts[0].id
+  } catch { /* older host: fall through to the literal */ }
+  return 'off'
 }
 
 /** The host reports a finish reason as a string in older builds and as
@@ -58,34 +72,20 @@ function failureText(failure, finish) {
   }
 }
 
-/** Set once the lowest level has failed; later calls skip straight to the
- *  provider default instead of paying for another broken round. */
-let effortBroken = false
-
-async function leastEffort(llm, route) {
-  try {
-    const info = await llm.resolveModelInfo?.({ provider: route.provider, model: route.model })
-    const efforts = info?.reasoning?.efforts
-    if (Array.isArray(efforts) && efforts.length > 0 && typeof efforts[0]?.id === 'string') return efforts[0].id
-  } catch { /* older host: fall through to the literal */ }
-  return 'off'
-}
-
 /**
- * Ask the model once and return its text.
+ * Ask the model once at the given effort and return its text.
  * @param ctx - host plugin context.
  * @param params.system - the system prompt.
  * @param params.text - the single user message.
- * @param params.warn - logger for the discarded-reply case.
+ * @param params.warn - logger for an empty reply.
  */
 export async function askOnce(ctx, { system, text, warn = () => {} }) {
   const llm = ctx.get('llm', false)
   if (llm === undefined || typeof llm.stream !== 'function') throw new Error('The llm service is not available.')
   const route = routeOf(ctx)
-  const effort = effortBroken ? undefined : await leastEffort(llm, route)
+  const effort = await quietEffort(llm, route)
 
-  /** One try at one effort. */
-  const attempt = async (reasoningEffort) => {
+  const attempt = async () => {
     let reply = ''
     let finish = ''
     let failure
@@ -94,9 +94,9 @@ export async function askOnce(ctx, { system, text, warn = () => {} }) {
       model: route.model,
       system,
       messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+      reasoningEffort: effort,
       signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     }
-    if (typeof reasoningEffort === 'string') options.reasoningEffort = reasoningEffort
     for await (const chunk of llm.stream(options)) {
       if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') reply += chunk.text
       else if (chunk?.type === 'finish') {
@@ -110,26 +110,13 @@ export async function askOnce(ctx, { system, text, warn = () => {} }) {
     return { text: trimmed, finish: finish || (trimmed === '' ? 'no-finish' : 'stop') }
   }
 
-  /** Retry once at the provider default when the chosen level breaks. */
-  const run = async (reasoningEffort) => {
-    try {
-      return await attempt(reasoningEffort)
-    } catch (error) {
-      if (reasoningEffort === undefined) throw error
-      warn('dsh-sidebar-memo: effort "' + String(reasoningEffort) + '" failed: ' + String(error?.message ?? error))
-      effortBroken = true
-      return attempt(undefined)
-    }
-  }
-
-  const first = await run(effort)
+  const first = await attempt()
   if (first.text !== '') return first.text
 
-  warn('dsh-sidebar-memo: effort "' + String(effort) + '" produced no text (' + first.finish + ')')
-  effortBroken = true
-  const retryEffort = effort === route.reasoningEffort ? undefined : route.reasoningEffort
-  if (retryEffort === effort) throw new Error('模型这次没有输出内容（' + first.finish + '）')
-  const second = await attempt(retryEffort)
+  // One more try at the same quiet level: an empty reply is usually a hiccup,
+  // and moving up the effort ladder is exactly what this call must not do.
+  warn('dsh-sidebar-memo: the model returned no text at effort "' + effort + '" (' + first.finish + '); retrying once')
+  const second = await attempt()
   if (second.text !== '') return second.text
-  throw new Error('模型这次没有输出内容（' + second.finish + '）')
+  throw new Error('模型这次没有输出内容（' + second.finish + '，思考档 ' + effort + '）')
 }
