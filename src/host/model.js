@@ -33,6 +33,17 @@ export function routeOf(ctx) {
   throw new Error('No model is available: add one in Harness settings.')
 }
 
+/** The host reports a finish reason as a string in older builds and as
+ *  `{ kind }` in newer ones; both spellings reach the same comparisons. */
+function finishKind(reason) {
+  if (typeof reason === 'string') return reason
+  if (reason !== null && typeof reason === 'object') {
+    if (typeof reason.kind === 'string') return reason.kind
+    if (typeof reason.type === 'string') return reason.type
+  }
+  return ''
+}
+
 /** Set once the lowest level has answered nothing; later calls skip straight
  *  to the provider default instead of paying for another empty round. */
 let effortBroken = false
@@ -65,7 +76,7 @@ export async function askOnce(ctx, { system, text, maxTokens = 4_096, warn = () 
     const budgets = [maxTokens, Math.min(maxTokens * 2, 16_384)]
     for (const budget of budgets) {
       let reply = ''
-      let finish
+      let finish = ''
       let failure
       const options = {
         provider: route.provider,
@@ -78,16 +89,21 @@ export async function askOnce(ctx, { system, text, maxTokens = 4_096, warn = () 
       if (typeof reasoningEffort === 'string') options.reasoningEffort = reasoningEffort
       for await (const chunk of llm.stream(options)) {
         if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') reply += chunk.text
-        else if (chunk?.type === 'finish') { finish = chunk.reason; failure = chunk.failure }
+        else if (chunk?.type === 'finish') {
+          finish = finishKind(chunk.reason)
+          failure = chunk.failure
+        }
       }
-      if (finish === 'error' || finish === 'aborted') throw new Error(failure?.message ?? String(finish))
+      if (finish === 'error' || finish === 'aborted') {
+        throw new Error(String(failure?.message ?? failure ?? finish))
+      }
       const trimmed = reply.trim()
-      if (trimmed !== '') return { text: trimmed, finish: finish ?? 'stop' }
+      if (trimmed !== '') return { text: trimmed, finish: finish || 'stop' }
       if (finish === 'max-tokens') {
         warn('dsh-sidebar-memo: the model used its whole output budget; retrying once with room')
         continue
       }
-      return { text: '', finish: finish ?? 'no-finish' }
+      return { text: '', finish: finish || 'no-finish' }
     }
     return { text: '', finish: 'max-tokens' }
   }
