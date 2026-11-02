@@ -2,10 +2,13 @@
 // the conversation uses, streamed through the host's llm service, assembled by
 // hand because a plugin does not import the harness packages.
 //
-// A bookkeeping call should not pay for deliberation, so the effort starts at the
-// lowest the model offers (efforts[0]). A model that fails or answers nothing at
-// that level is asked again at the provider default, and the working level is
-// kept for the rest of the process.
+// No output budget is set: these calls write a diary page or a short critique,
+// and thinking tokens are billed against the same budget, so an arbitrary cap
+// only creates a way to fail. The provider's own output limit is the ceiling.
+//
+// The effort starts at the lowest the model offers (efforts[0]). A model that
+// fails or answers nothing at that level is asked again at the provider default,
+// and the working level is kept for the rest of the process.
 
 const CALL_TIMEOUT_MS = 120_000
 
@@ -73,51 +76,38 @@ async function leastEffort(llm, route) {
  * @param ctx - host plugin context.
  * @param params.system - the system prompt.
  * @param params.text - the single user message.
- * @param params.maxTokens - the first output budget.
  * @param params.warn - logger for the discarded-reply case.
  */
-export async function askOnce(ctx, { system, text, maxTokens = 4_096, warn = () => {} }) {
+export async function askOnce(ctx, { system, text, warn = () => {} }) {
   const llm = ctx.get('llm', false)
   if (llm === undefined || typeof llm.stream !== 'function') throw new Error('The llm service is not available.')
   const route = routeOf(ctx)
   const effort = effortBroken ? undefined : await leastEffort(llm, route)
 
-  /** One try at one effort, with a second budget when thinking eats the first. */
+  /** One try at one effort. */
   const attempt = async (reasoningEffort) => {
-    const budgets = [maxTokens, Math.min(maxTokens * 2, 16_384)]
-    for (const budget of budgets) {
-      let reply = ''
-      let finish = ''
-      let failure
-      const options = {
-        provider: route.provider,
-        model: route.model,
-        system,
-        messages: [{ role: 'user', content: [{ type: 'text', text }] }],
-        maxTokens: budget,
-        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-      }
-      if (typeof reasoningEffort === 'string') options.reasoningEffort = reasoningEffort
-      for await (const chunk of llm.stream(options)) {
-        if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') reply += chunk.text
-        else if (chunk?.type === 'finish') {
-          finish = finishKind(chunk.reason)
-          const reason = chunk.reason
-          failure = chunk.failure ?? (reason !== null && typeof reason === 'object' ? reason.failure : undefined)
-        }
-      }
-      if (finish === 'error' || finish === 'aborted') {
-        throw new Error(failureText(failure, finish))
-      }
-      const trimmed = reply.trim()
-      if (trimmed !== '') return { text: trimmed, finish: finish || 'stop' }
-      if (finish === 'max-tokens') {
-        warn('dsh-sidebar-memo: the model used its whole output budget; retrying once with room')
-        continue
-      }
-      return { text: '', finish: finish || 'no-finish' }
+    let reply = ''
+    let finish = ''
+    let failure
+    const options = {
+      provider: route.provider,
+      model: route.model,
+      system,
+      messages: [{ role: 'user', content: [{ type: 'text', text }] }],
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
     }
-    return { text: '', finish: 'max-tokens' }
+    if (typeof reasoningEffort === 'string') options.reasoningEffort = reasoningEffort
+    for await (const chunk of llm.stream(options)) {
+      if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') reply += chunk.text
+      else if (chunk?.type === 'finish') {
+        finish = finishKind(chunk.reason)
+        const reason = chunk.reason
+        failure = chunk.failure ?? (reason !== null && typeof reason === 'object' ? reason.failure : undefined)
+      }
+    }
+    if (finish === 'error' || finish === 'aborted') throw new Error(failureText(failure, finish))
+    const trimmed = reply.trim()
+    return { text: trimmed, finish: finish || (trimmed === '' ? 'no-finish' : 'stop') }
   }
 
   /** Retry once at the provider default when the chosen level breaks. */
