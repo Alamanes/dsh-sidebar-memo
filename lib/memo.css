@@ -499,7 +499,10 @@ blockquote.dshm-review {
   background: color-mix(in srgb, var(--dshm-danger) 7%, transparent);
   color: var(--dshm-ink-2); font-size: 10.5px; line-height: 1.6;
 }
-.dshm-notes-hint { margin: 0 0 7px; color: var(--dshm-ink-4); font-size: 10px; }
+.dshm-fail.is-quiet {
+  border-left-color: var(--dshm-line-strong);
+  background: var(--dshm-sunken);
+}
 .dshm-compose.is-notes {
   align-items: flex-end; margin: 0; padding: 7px 7px 7px 10px; border-radius: 9px;
 }
