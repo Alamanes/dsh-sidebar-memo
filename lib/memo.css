@@ -485,19 +485,7 @@ blockquote.dshm-review {
   background: color-mix(in srgb, var(--dshm-danger) 7%, transparent);
   color: var(--dshm-ink-2); font-size: 10.5px; line-height: 1.6;
 }
-.dshm-fail.is-quiet {
-  border-left-color: var(--dshm-line-strong);
-  background: var(--dshm-sunken);
-}
-.dshm-compose.is-notes {
-  align-items: flex-end; margin: 0; padding: 7px 7px 7px 10px; border-radius: 9px;
-}
-.dshm-notes-input {
-  flex: 1; min-width: 0; padding: 1px 0; border: none; outline: none; resize: none;
-  background: transparent; color: var(--dshm-ink);
-  font-family: inherit; font-size: 12.5px; line-height: 1.7;
-}
-.dshm-notes-input::placeholder { color: var(--dshm-ink-4); }
+.dshm-diary-block .dshm-compose { margin: 6px 0 2px; }
 
 .dshm-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 11px 12px; color: var(--dshm-ink-3); font-size: 10.5px; }
 .dshm-foot.is-flush { padding-bottom: 2px; }
