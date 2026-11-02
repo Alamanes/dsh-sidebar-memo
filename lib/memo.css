@@ -1,9 +1,9 @@
 /* dsh-sidebar-memo — the panel's styles.
-   Every neutral colour comes from the token layer, so the suite's theme and the
-   host's light/dark switch both reach here. Two semantic colours are the panel's
-   own: vermilion for a goal in progress, moss for one that is done. Structure
-   carries the hierarchy — hairlines, one binding line, one rule-marked critique —
-   because a memo column is a column of entries, not a dashboard of tiles. */
+   Every colour comes from the token layer, so the suite's theme and the host's
+   light/dark switch both reach here; the accent is the theme's own brand colour,
+   never a palette of the panel's. Structure carries the hierarchy — hairlines,
+   one binding line, one rule-marked critique — because a memo column is a column
+   of entries, not a dashboard of tiles. */
 
 .dshm-root {
   --dshm-ink: var(--dshui-text-primary, var(--dsw-alias-label-primary));
@@ -12,16 +12,17 @@
   --dshm-ink-4: var(--dshui-text-dimmed, var(--dsw-alias-label-quaternary));
   --dshm-line: var(--dshui-border-2, var(--dsw-alias-border-l2, rgba(127, 127, 127, .2)));
   --dshm-line-strong: var(--dshui-border-3, var(--dsw-alias-border-l3, rgba(127, 127, 127, .34)));
-  --dshm-accent: var(--dshui-brand, var(--dsw-alias-state-business-primary, #4d6bfe));
+  /* The accent follows whatever theme the host runs: the suite token first, then
+     the DSH brand aliases, then the plain business colour, then a literal. */
+  --dshm-accent: var(--dshui-brand, var(--dsw-alias-brand-primary, var(--dsw-alias-state-business-primary, var(--dsw-alias-button-primary-fill, #4d6bfe))));
   --dshm-fill: var(--dshui-brand-fill, var(--dshm-accent));
   --dshm-on-fill: var(--dshui-text-on-brand, #fff);
   --dshm-hover: var(--dshui-surface-hover, var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, .09)));
   --dshm-panel: var(--dshui-surface-1, var(--dsw-alias-bg-layer-1, transparent));
   --dshm-sunken: var(--dshui-neutral-fill, var(--dsw-alias-bg-layer-2, rgba(127, 127, 127, .08)));
   --dshm-danger: var(--dshui-danger, var(--dsw-alias-state-error-primary, #e5484d));
-  --dshm-vermilion: #a93b2c;
-  --dshm-vermilion-soft: rgba(169, 59, 44, .09);
-  --dshm-moss: #4d6f52;
+  --dshm-accent-soft: color-mix(in srgb, var(--dshm-accent) 9%, transparent);
+  --dshm-done: color-mix(in srgb, var(--dshm-accent) 55%, var(--dshm-ink-3));
   --dshm-fast: var(--dshui-duration-fast, .15s);
   --dshm-ease: var(--dshui-ease-standard, cubic-bezier(.32, .72, 0, 1));
   --dshm-spring: var(--dshui-ease-spring, cubic-bezier(.32, .72, 0, 1));
@@ -38,14 +39,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-@media (prefers-color-scheme: dark) {
-  .dshm-root {
-    --dshm-vermilion: #d9755f;
-    --dshm-vermilion-soft: rgba(217, 117, 95, .13);
-    --dshm-moss: #8bb18f;
-  }
-}
-
 /* ---------- head ---------- */
 .dshm-head { flex: none; display: flex; align-items: baseline; gap: 8px; padding: 15px 15px 9px; }
 .dshm-title { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .02em; }
@@ -54,13 +47,13 @@
   color: var(--dshm-ink-3); font-size: 11px; font-variant-numeric: tabular-nums;
 }
 /* what the model just did, said where the count normally sits, then gone */
-.dshm-notice { color: var(--dshm-vermilion); animation: dshm-notice-in .28s var(--dshm-ease) both; }
+.dshm-notice { color: var(--dshm-accent); animation: dshm-notice-in .28s var(--dshm-ease) both; }
 @keyframes dshm-notice-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 .dshm-spacer { flex: 1; }
 .dshm-avatar {
   flex: none; display: block; border-radius: 50%; object-fit: cover;
   -webkit-user-select: none; user-select: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dshm-vermilion) 22%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--dshm-accent) 22%, transparent);
 }
 .dshm-iconbtn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -85,22 +78,22 @@
 .dshm-tab[data-active='true'] { color: var(--dshm-ink); }
 .dshm-tab[data-active='true']::after {
   content: ""; position: absolute; left: -2px; right: -2px; bottom: -1px; height: 2px;
-  background: var(--dshm-vermilion); border-radius: 1px;
+  background: var(--dshm-accent); border-radius: 1px;
 }
 .dshm-tab-count {
-  margin-left: 5px; font-size: 10px; color: var(--dshm-vermilion);
+  margin-left: 5px; font-size: 10px; color: var(--dshm-accent);
   font-variant-numeric: tabular-nums;
 }
 .dshm-tab-dot {
   position: absolute; top: 5px; right: -7px; width: 5px; height: 5px; border-radius: 50%;
-  background: var(--dshm-vermilion); animation: dshm-pop .4s var(--dshm-spring) both;
+  background: var(--dshm-accent); animation: dshm-pop .4s var(--dshm-spring) both;
 }
 
 /* ---------- model activity ---------- */
 .dshm-runbar {
   position: absolute; top: 0; left: 0; right: 0; height: 2px; pointer-events: none;
   opacity: 0; z-index: 5; transition: opacity .25s ease;
-  background: linear-gradient(90deg, transparent, var(--dshm-vermilion), transparent);
+  background: linear-gradient(90deg, transparent, var(--dshm-accent), transparent);
 }
 .dshm-runbar[data-on='true'] { animation: dshm-breathe 1.9s ease-in-out infinite; }
 
@@ -137,9 +130,9 @@
   background: transparent; color: transparent; cursor: pointer;
   transition: border-color var(--dshm-fast) ease, background var(--dshm-fast) ease, transform .12s ease;
 }
-.dshm-check:hover { border-color: var(--dshm-vermilion); }
+.dshm-check:hover { border-color: var(--dshm-accent); }
 .dshm-check:active { transform: scale(.88); }
-.dshm-check[data-done='true'] { border-color: var(--dshm-moss); background: var(--dshm-moss); color: #fff; }
+.dshm-check[data-done='true'] { border-color: var(--dshm-done); background: var(--dshm-done); color: var(--dshm-on-fill); }
 .dshm-check svg { display: block; width: 10px; height: 10px; margin: 1.5px auto 0; }
 .dshm-check[data-done='true'] svg path { stroke-dasharray: 16; animation: dshm-draw .3s var(--dshm-ease) forwards; }
 
@@ -179,8 +172,8 @@
 .dshm-note {
   position: relative; margin: 7px 0 1px 25px; padding: 8px 10px 8px 11px;
   max-height: min(46vh, 300px); overflow-y: auto; scrollbar-width: thin;
-  border-left: 2px solid color-mix(in srgb, var(--dshm-vermilion) 32%, transparent);
-  background: var(--dshm-vermilion-soft);
+  border-left: 2px solid color-mix(in srgb, var(--dshm-accent) 32%, transparent);
+  background: var(--dshm-accent-soft);
   border-radius: 0 4px 4px 0;
   animation: dshm-unfold .26s var(--dshm-ease) both;
   overscroll-behavior: contain;
@@ -211,11 +204,11 @@
 /* ---------- inline editing ---------- */
 .dshm-edit-input {
   box-sizing: border-box; width: 100%; margin: 0 0 1px; padding: 3px 7px;
-  border: 1px solid color-mix(in srgb, var(--dshm-vermilion) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dshm-accent) 45%, transparent);
   border-radius: 6px; background: var(--dshm-panel); color: var(--dshm-ink);
   font-family: inherit; font-size: 13.5px; font-weight: 500; line-height: 1.5;
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-vermilion) 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-accent) 10%, transparent);
 }
 .dshm-note-edit {
   display: block; box-sizing: border-box; width: 100%; min-height: 88px; max-height: 40vh;
@@ -224,7 +217,7 @@
   font-family: inherit; font-size: 12.5px; line-height: 1.72;
   outline: none; resize: vertical;
 }
-.dshm-note-edit:focus { border-color: color-mix(in srgb, var(--dshm-vermilion) 45%, transparent); }
+.dshm-note-edit:focus { border-color: color-mix(in srgb, var(--dshm-accent) 45%, transparent); }
 .dshm-note-edit::placeholder { color: var(--dshm-ink-4); }
 
 .dshm-note-summary { min-width: 0; max-width: 100%; align-items: flex-start; }
@@ -240,10 +233,10 @@
   background: transparent; cursor: pointer;
   transition: background var(--dshm-fast) ease, border-color var(--dshm-fast) ease;
 }
-.dshm-stepbox:hover { border-color: var(--dshm-vermilion); }
+.dshm-stepbox:hover { border-color: var(--dshm-accent); }
 .dshm-stepbox[data-done='true'] {
-  border-color: var(--dshm-moss);
-  background: var(--dshm-moss)
+  border-color: var(--dshm-done);
+  background: var(--dshm-done)
     url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.3 6.2 4.8 8.7l4.9-5.6'/%3E%3C/svg%3E")
     center / 9px 9px no-repeat;
 }
@@ -266,8 +259,8 @@
   transition: border-color .18s ease, box-shadow .18s ease;
 }
 .dshm-compose:focus-within {
-  border-color: color-mix(in srgb, var(--dshm-vermilion) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-vermilion) 11%, transparent);
+  border-color: color-mix(in srgb, var(--dshm-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-accent) 11%, transparent);
 }
 .dshm-input {
   flex: 1; min-width: 0; height: 26px; border: none; background: transparent;
@@ -279,7 +272,7 @@
   background: var(--dshm-sunken); color: var(--dshm-ink-3); font-size: 15px; line-height: 1;
   cursor: pointer; transition: background .15s ease, color .15s ease, transform .15s ease;
 }
-.dshm-add[data-ready='true'] { background: var(--dshm-vermilion); color: #fff; }
+.dshm-add[data-ready='true'] { background: var(--dshm-accent); color: var(--dshm-on-fill); }
 .dshm-add[data-ready='true']:hover { transform: scale(1.06); }
 
 /* ---------- goal page ---------- */
@@ -289,9 +282,9 @@
 }
 .dshm-goal {
   position: relative; margin: 6px 0 4px; padding: 3px 0 3px 13px;
-  border-left: 2px solid var(--dshm-vermilion);
+  border-left: 2px solid var(--dshm-accent);
 }
-.dshm-goal[data-done='true'] { border-left-color: var(--dshm-moss); opacity: .78; }
+.dshm-goal[data-done='true'] { border-left-color: var(--dshm-done); opacity: .78; }
 .dshm-goal-title {
   font-size: 15px; line-height: 1.55; font-weight: 600; letter-spacing: .01em;
   color: var(--dshm-ink); overflow-wrap: anywhere;
@@ -300,9 +293,8 @@
   display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px;
   margin-top: 5px; color: var(--dshm-ink-3); font-size: 10.5px; line-height: 1.5;
 }
-.dshm-goal-days { font-variant-numeric: tabular-nums; color: var(--dshm-vermilion); }
-.dshm-goal-days[data-late='true'] { color: var(--dshm-danger); }
-.dshm-goal-days.is-done { color: var(--dshm-moss); }
+.dshm-goal-days { font-variant-numeric: tabular-nums; color: var(--dshm-accent); }
+.dshm-goal-days.is-done { color: var(--dshm-done); }
 .dshm-goal-note { color: var(--dshm-ink-3); overflow-wrap: anywhere; }
 
 .dshm-goal-form { display: flex; flex-direction: column; gap: 9px; margin: 8px 0 2px; padding-left: 13px; border-left: 2px solid var(--dshm-line-strong); }
@@ -317,11 +309,10 @@
 }
 textarea.dshm-goal-input { resize: vertical; min-height: 52px; }
 .dshm-goal-input:focus {
-  border-color: color-mix(in srgb, var(--dshm-vermilion) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-vermilion) 10%, transparent);
+  border-color: color-mix(in srgb, var(--dshm-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dshm-accent) 10%, transparent);
 }
 .dshm-goal-input::placeholder { color: var(--dshm-ink-4); }
-.dshm-goal-row { display: grid; grid-template-columns: minmax(96px, 120px) 1fr; gap: 8px; }
 .dshm-goal-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .dshm-btn {
   height: 25px; padding: 0 10px; border: 1px solid var(--dshm-line); border-radius: 6px;
@@ -329,7 +320,7 @@ textarea.dshm-goal-input { resize: vertical; min-height: 52px; }
   cursor: pointer; transition: color var(--dshm-fast) ease, border-color var(--dshm-fast) ease, background var(--dshm-fast) ease;
 }
 .dshm-btn:hover { color: var(--dshm-ink); border-color: var(--dshm-line-strong); }
-.dshm-btn.is-primary { border-color: transparent; background: var(--dshm-vermilion); color: #fff; }
+.dshm-btn.is-primary { border-color: transparent; background: var(--dshm-accent); color: var(--dshm-on-fill); }
 .dshm-btn.is-primary:hover { filter: brightness(1.06); }
 .dshm-btn:disabled { opacity: .55; cursor: default; }
 .dshm-link {
@@ -360,7 +351,7 @@ textarea.dshm-goal-input { resize: vertical; min-height: 52px; }
 }
 .dshm-log-item::before {
   content: ""; position: absolute; left: 0; top: 9px; width: 4px; height: 4px; border-radius: 50%;
-  background: var(--dshm-vermilion); opacity: .55;
+  background: var(--dshm-accent); opacity: .55;
 }
 .dshm-log-at {
   flex: none; color: var(--dshm-ink-4); font-size: 10px; line-height: 1.9;
@@ -373,8 +364,8 @@ textarea.dshm-goal-input { resize: vertical; min-height: 52px; }
 /* ---------- the critique ---------- */
 blockquote.dshm-review {
   margin: 14px 0 2px; padding: 9px 11px 10px 12px;
-  border-left: 2px solid var(--dshm-vermilion);
-  background: var(--dshm-vermilion-soft);
+  border-left: 2px solid var(--dshm-accent);
+  background: var(--dshm-accent-soft);
   border-radius: 0 4px 4px 0;
   animation: dshm-ink-in .5s var(--dshm-ease) both;
 }
@@ -382,7 +373,7 @@ blockquote.dshm-review {
   display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
   margin-bottom: 4px;
 }
-.dshm-review-who { color: var(--dshm-vermilion); font-size: 10.5px; letter-spacing: .08em; }
+.dshm-review-who { color: var(--dshm-accent); font-size: 10.5px; letter-spacing: .08em; }
 .dshm-review-meta { color: var(--dshm-ink-4); font-size: 10px; font-variant-numeric: tabular-nums; }
 .dshm-review-body {
   margin: 0; font-family: var(--dshm-serif); font-size: 13px; line-height: 1.85;
@@ -394,7 +385,7 @@ blockquote.dshm-review {
   color: var(--dshm-ink-3); font-size: 11px; line-height: 1.6;
 }
 .dshm-pulse {
-  flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dshm-vermilion);
+  flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--dshm-accent);
   animation: dshm-breathe 1.4s ease-in-out infinite;
 }
 
@@ -431,8 +422,8 @@ blockquote.dshm-review {
 }
 .dshm-voice:hover { border-color: var(--dshm-line-strong); }
 .dshm-voice[data-on='true'] {
-  border-color: color-mix(in srgb, var(--dshm-vermilion) 60%, transparent);
-  background: var(--dshm-vermilion-soft);
+  border-color: color-mix(in srgb, var(--dshm-accent) 60%, transparent);
+  background: var(--dshm-accent-soft);
 }
 .dshm-voice-label { color: var(--dshm-ink); font-size: 12px; font-weight: 500; }
 .dshm-voice-hint { color: var(--dshm-ink-3); font-size: 9.5px; line-height: 1.5; }
@@ -442,7 +433,7 @@ blockquote.dshm-review {
   background: var(--dshm-sunken); color: var(--dshm-ink);
   font-family: inherit; font-size: 11.5px; line-height: 1.7; outline: none; resize: vertical;
 }
-.dshm-voice-custom:focus { border-color: color-mix(in srgb, var(--dshm-vermilion) 50%, transparent); }
+.dshm-voice-custom:focus { border-color: color-mix(in srgb, var(--dshm-accent) 50%, transparent); }
 .dshm-voice-custom::placeholder { color: var(--dshm-ink-4); }
 .dshm-sheet-hint { margin: 8px 0 2px; color: var(--dshm-ink-4); font-size: 9.5px; line-height: 1.6; }
 
@@ -476,19 +467,19 @@ blockquote.dshm-review {
   cursor: pointer; transition: color var(--dshm-fast) ease, background var(--dshm-fast) ease;
 }
 .dshm-datechip:hover { color: var(--dshm-ink); }
-.dshm-datechip[data-active='true'] { background: var(--dshm-vermilion); color: #fff; }
+.dshm-datechip[data-active='true'] { background: var(--dshm-accent); color: var(--dshm-on-fill); }
 
 .dshm-paper {
   position: relative; max-height: min(40vh, 340px); overflow-y: auto;
   margin: 0 0 8px; padding: 12px 14px 14px;
-  border-left: 2px solid color-mix(in srgb, var(--dshm-vermilion) 30%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--dshm-accent) 30%, transparent);
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--dshm-vermilion) 4%, transparent), transparent 60%),
+    linear-gradient(180deg, color-mix(in srgb, var(--dshm-accent) 4%, transparent), transparent 60%),
     var(--dshm-panel);
   border-radius: 0 4px 4px 0;
   transition: border-color .25s ease;
 }
-.dshm-paper.is-writing { border-left-color: var(--dshm-vermilion); }
+.dshm-paper.is-writing { border-left-color: var(--dshm-accent); }
 .dshm-paper-body {
   font-family: var(--dshm-serif); font-size: 13px; line-height: 1.95;
   color: var(--dshm-ink); white-space: pre-wrap; overflow-wrap: anywhere;
@@ -499,7 +490,7 @@ blockquote.dshm-review {
 }
 .dshm-inkbar {
   position: absolute; left: 0; top: 0; width: 2px; height: 38%;
-  background: var(--dshm-vermilion); opacity: .8;
+  background: var(--dshm-accent); opacity: .8;
   animation: dshm-inkbar 1.6s var(--dshm-ease) infinite;
 }
 .dshm-fail {

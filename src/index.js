@@ -252,7 +252,6 @@ export function apply(ctx, config) {
             const item = await store.saveGoal({
               id: body?.id,
               text: body?.text,
-              due: body?.due,
               note: body?.note,
             })
             const fresh = body?.id === undefined || body?.id === ''

@@ -3,12 +3,8 @@
 import { askOnce } from './model.js'
 
 const DIARY_SYSTEM = [
-  '你是用户日记的代笔者。用户口述今天做了什么，你把它写成她自己的日记。',
-  '第一人称「我」，像她自己落笔，不像工作总结。',
-  '只用她给的素材：人名、时间、数字、情绪都照实；素材没说的不编，宁可少写。',
-  '中文书面语，长句为主，句子之间递进；少用短句碎句、不列清单、不加标题。',
-  '保留原话里鲜活的细节和语气，不改成公文腔。',
-  '只输出日记正文，不解释，不加日期。',
+  '把用户口述的事写成她自己的日记：第一人称，按原样复述，保留她的细节和语气。',
+  '不加评论、不总结、不编造，不写标题和日期，不写任何说明。只输出正文。',
 ].join('\n')
 
 const REVIEW_SYSTEM = [
@@ -38,7 +34,6 @@ const clip = (text, max) => (text.length > max ? text.slice(0, max) + '…' : te
 
 function goalBrief(goal) {
   const lines = ['目标：' + goal.text]
-  if (goal.due !== '') lines.push('截止：' + goal.due)
   if (goal.note !== '') lines.push('衡量：' + goal.note)
   lines.push('立下那天：' + goal.since)
   if (goal.logs.length > 0) {
@@ -57,12 +52,10 @@ function goalBrief(goal) {
  * @param params.warn - logger.
  */
 export async function composeDiary(ctx, { date, notes, current, warn }) {
-  const text = [
-    '日期：' + date,
-    current.trim() === '' ? '这一页还没有内容。' : '已经有的一页（保留原有的事实，把新素材并进去，重写整页，不要丢掉已有的内容）：\n' + clip(current.trim(), 8_000),
-    '用户今天的口述：',
-    clip(notes.trim(), 12_000),
-  ].join('\n\n')
+  const parts = ['日期：' + date]
+  if (current.trim() !== '') parts.push('已有的一页，把新素材并进去、保留原有事实：\n' + clip(current.trim(), 8_000))
+  parts.push('她说的：\n' + clip(notes.trim(), 12_000))
+  const text = parts.join('\n\n')
   return askOnce(ctx, { system: DIARY_SYSTEM, text, maxTokens: 2_048, warn })
 }
 

@@ -44,7 +44,7 @@ function describe(item) {
 function goalLines(goal) {
   const head = '- ' + (goal.done ? '[x] ' : '[ ] ') + goal.text + '  (' + goal.id + ')'
   const bits = []
-  if (goal.due !== '') bits.push('截止 ' + goal.due + (goal.ending === '' ? '' : '，' + goal.ending))
+  if (goal.note !== '') bits.push(goal.note.length > 40 ? goal.note.slice(0, 40) + '…' : goal.note)
   if (goal.logs.length > 0) bits.push(goal.logs.length + ' 条进展')
   if (goal.review !== null) bits.push('最近点评 ' + goal.review.at.slice(0, 10))
   return bits.length === 0 ? head : head + '\n  ' + bits.join(' · ')
@@ -53,7 +53,6 @@ function goalLines(goal) {
 function goalPatch(args) {
   const patch = {}
   if (args?.text !== undefined) patch.text = args.text
-  if (args?.due !== undefined) patch.due = args.due
   if (args?.note !== undefined) patch.note = args.note
   return patch
 }
@@ -84,7 +83,6 @@ export function createTools({ store }) {
             op: { type: 'string', enum: ['set', 'log', 'review', 'done', 'drop'], description: 'set opens or edits one; log adds a progress line; review stores your critique; done closes it; drop deletes it.' },
             id: { type: 'string', description: 'Goal id from op=read; omit for the newest open goal.' },
             text: { type: 'string', description: 'The goal sentence, for set.' },
-            due: { type: 'string', description: 'Deadline YYYY-MM-DD, for set.' },
             note: { type: 'string', description: 'How it is measured, for set.' },
             log: { type: 'string', description: 'One progress line, for log.' },
             review: { type: 'string', description: 'The critique text, for review.' },
@@ -171,7 +169,7 @@ export function createTools({ store }) {
           if (op === 'set') {
             const item = await store.saveGoal({ id: goal.id, ...goalPatch(goal) })
             store.endActivity('memo', 'goal-set', { ids: [item.id] })
-            return '目标记下了：' + item.text + (item.due === '' ? '' : '（截止 ' + item.due + '）') + '  (' + item.id + ')'
+            return '目标记下了：' + item.text + '  (' + item.id + ')'
           }
           if (op === 'log') {
             const item = await store.logGoal(goal.id, goal.log)

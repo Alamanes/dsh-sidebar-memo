@@ -95,7 +95,6 @@ function normalizeGoal(item) {
   return {
     id: typeof item?.id === 'string' && item.id !== '' ? item.id : newId('g'),
     text: clip(item?.text, GOAL_TEXT_MAX),
-    due: isDate(item?.due) ? item.due : '',
     note: clip(item?.note, GOAL_NOTE_MAX),
     since: isDate(item?.since) ? item.since : today(),
     done: item?.done === true,
@@ -332,16 +331,6 @@ export function createStore({ root, warn = () => {} }) {
     return { text, at: notesAt, fresh: notesAt > pageAt }
   }
 
-  function goalEnding(goal) {
-    if (goal.due === '') return ''
-    const days = Math.ceil((new Date(goal.due + 'T23:59:59').getTime() - Date.now()) / 86_400_000)
-    return days >= 0 ? '还剩 ' + days + ' 天' : '已经逾期 ' + -days + ' 天'
-  }
-
-  function goalView(goal) {
-    return { ...goal, ending: goalEnding(goal) }
-  }
-
   async function state(date) {
     const page = await diaryPage(date)
     const [items, dates, raw, cfg, book, diaryTime] = await Promise.all([
@@ -362,7 +351,7 @@ export function createStore({ root, warn = () => {} }) {
       diary: page,
       diaryAt: diaryTime,
       raw,
-      goals: ordered.map(goalView),
+      goals: ordered,
       mood: cfg.mood,
       custom: cfg.custom,
       activity: { ...activity },
@@ -474,7 +463,7 @@ export function createStore({ root, warn = () => {} }) {
   }
 
   /** Open a goal, or rewrite the fields of an existing one. */
-  async function saveGoal({ id = '', text, due, note }) {
+  async function saveGoal({ id = '', text, note }) {
     return serialize(async () => {
       const book = await loadGoals()
       const wanted = String(id ?? '').trim()
@@ -487,7 +476,6 @@ export function createStore({ root, warn = () => {} }) {
           if (title === '') throw new Error('目标不能是空的')
           next.text = title
         }
-        if (due !== undefined) next.due = due === '' ? '' : isDate(due) ? due : next.due
         if (note !== undefined) next.note = clip(note, GOAL_NOTE_MAX)
         const list = book.items.slice()
         list[index] = next
@@ -497,12 +485,10 @@ export function createStore({ root, warn = () => {} }) {
       }
       const title = clip(text, GOAL_TEXT_MAX)
       if (title === '') throw new Error('目标不能是空的')
-      if (due !== undefined && due !== '' && !isDate(due)) throw new Error('截止日期要写成 YYYY-MM-DD')
       if (book.items.filter(goal => !goal.done).length >= GOALS_MAX) throw new Error('未完成的目标太多了，先收一收')
       const goal = {
         id: newId('g'),
         text: title,
-        due: due === undefined || due === '' ? '' : due,
         note: clip(note, GOAL_NOTE_MAX),
         since: today(),
         done: false,
