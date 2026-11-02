@@ -248,9 +248,7 @@
 }
 
 .dshm-empty { padding: 26px 16px 22px; text-align: center; }
-.dshm-empty-title { color: var(--dshm-ink-2); font-size: 12.5px; font-weight: 500; margin: 0 0 5px; }
-.dshm-empty-body { color: var(--dshm-ink-3); font-size: 11.5px; line-height: 1.7; margin: 0; }
-.dshm-empty-action { margin-top: 12px; }
+.dshm-empty-title { color: var(--dshm-ink-4); font-size: 12px; font-weight: 400; margin: 0; letter-spacing: .08em; }
 
 .dshm-compose {
   flex: none; display: flex; align-items: center; gap: 7px; margin: 6px 11px 12px;
@@ -268,10 +266,14 @@
 }
 .dshm-input::placeholder { color: var(--dshm-ink-4); }
 .dshm-add {
-  flex: none; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%;
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%;
   background: var(--dshm-sunken); color: var(--dshm-ink-3); font-size: 15px; line-height: 1;
   cursor: pointer; transition: background .15s ease, color .15s ease, transform .15s ease;
 }
+.dshm-add svg { display: block; }
+.dshm-add:disabled { cursor: default; }
+.dshm-add.is-spinning svg { animation: dshm-spin 1s linear infinite; }
 .dshm-add[data-ready='true'] { background: var(--dshm-accent); color: var(--dshm-on-fill); }
 .dshm-add[data-ready='true']:hover { transform: scale(1.06); }
 
@@ -298,8 +300,6 @@
 .dshm-goal-note { color: var(--dshm-ink-3); overflow-wrap: anywhere; }
 
 .dshm-goal-form { display: flex; flex-direction: column; gap: 9px; margin: 8px 0 2px; padding-left: 13px; border-left: 2px solid var(--dshm-line-strong); }
-.dshm-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.dshm-field-label { color: var(--dshm-ink-3); font-size: 10.5px; letter-spacing: .03em; }
 .dshm-goal-input {
   box-sizing: border-box; width: 100%; padding: 5px 8px;
   border: 1px solid var(--dshm-line); border-radius: 6px;
@@ -314,29 +314,17 @@ textarea.dshm-goal-input { resize: vertical; min-height: 52px; }
 }
 .dshm-goal-input::placeholder { color: var(--dshm-ink-4); }
 .dshm-goal-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.dshm-btn {
-  height: 25px; padding: 0 10px; border: 1px solid var(--dshm-line); border-radius: 6px;
-  background: transparent; color: var(--dshm-ink-2); font-family: inherit; font-size: 11.5px;
-  cursor: pointer; transition: color var(--dshm-fast) ease, border-color var(--dshm-fast) ease, background var(--dshm-fast) ease;
+.dshm-act {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; padding: 0; border: none; border-radius: 5px;
+  background: transparent; color: var(--dshm-ink-3); cursor: pointer;
+  transition: color var(--dshm-fast) ease, background var(--dshm-fast) ease;
 }
-.dshm-btn:hover { color: var(--dshm-ink); border-color: var(--dshm-line-strong); }
-.dshm-btn.is-primary { border-color: transparent; background: var(--dshm-accent); color: var(--dshm-on-fill); }
-.dshm-btn.is-primary:hover { filter: brightness(1.06); }
-.dshm-btn:disabled { opacity: .55; cursor: default; }
-.dshm-link {
-  padding: 0; border: none; background: none; color: var(--dshm-ink-3);
-  font-family: inherit; font-size: 10.5px; cursor: pointer;
-  transition: color var(--dshm-fast) ease;
-}
-.dshm-link:hover { color: var(--dshm-ink); }
-.dshm-link.is-danger:hover { color: var(--dshm-danger); }
-.dshm-goal-new {
-  margin-top: 12px; padding: 7px 0; width: 100%; border: 1px dashed var(--dshm-line);
-  border-radius: 7px; background: transparent; color: var(--dshm-ink-3);
-  font-family: inherit; font-size: 11.5px; cursor: pointer;
-  transition: color var(--dshm-fast) ease, border-color var(--dshm-fast) ease;
-}
-.dshm-goal-new:hover { color: var(--dshm-ink); border-color: var(--dshm-line-strong); }
+.dshm-act:hover { color: var(--dshm-ink); background: var(--dshm-hover); }
+.dshm-act.is-danger:hover { color: var(--dshm-danger); }
+.dshm-act:disabled { opacity: .45; cursor: default; }
+.dshm-act svg { display: block; }
+.dshm-goals > .dshm-act { margin-top: 6px; }
 
 /* ---------- progress log ---------- */
 .dshm-log { margin-top: 12px; }
@@ -426,7 +414,6 @@ blockquote.dshm-review {
   background: var(--dshm-accent-soft);
 }
 .dshm-voice-label { color: var(--dshm-ink); font-size: 12px; font-weight: 500; }
-.dshm-voice-hint { color: var(--dshm-ink-3); font-size: 9.5px; line-height: 1.5; }
 .dshm-voice-custom {
   box-sizing: border-box; width: 100%; margin-top: 8px; padding: 6px 8px;
   border: 1px solid var(--dshm-line); border-radius: 6px;
@@ -435,7 +422,6 @@ blockquote.dshm-review {
 }
 .dshm-voice-custom:focus { border-color: color-mix(in srgb, var(--dshm-accent) 50%, transparent); }
 .dshm-voice-custom::placeholder { color: var(--dshm-ink-4); }
-.dshm-sheet-hint { margin: 8px 0 2px; color: var(--dshm-ink-4); font-size: 9.5px; line-height: 1.6; }
 
 /* ---------- diary ---------- */
 .dshm-divider { height: 1px; margin: 22px 0 18px; background: var(--dshm-line); }
@@ -512,16 +498,10 @@ blockquote.dshm-review {
   font-family: inherit; font-size: 12.5px; line-height: 1.7;
 }
 .dshm-notes-input::placeholder { color: var(--dshm-ink-4); }
-.dshm-add.is-wide { width: auto; padding: 0 11px; border-radius: 7px; font-size: 11.5px; }
 
 .dshm-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 11px 12px; color: var(--dshm-ink-3); font-size: 10.5px; }
 .dshm-foot.is-flush { padding-bottom: 2px; }
-.dshm-textbtn {
-  height: 22px; padding: 0 8px; border: 1px solid var(--dshm-line); border-radius: 999px;
-  background: transparent; color: var(--dshm-ink-2); font-family: inherit; font-size: 10.5px;
-  cursor: pointer; transition: color var(--dshm-fast) ease, border-color var(--dshm-fast) ease;
-}
-.dshm-textbtn:hover { color: var(--dshm-ink); border-color: var(--dshm-line-strong); }
+
 
 @keyframes dshm-arrive { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 @keyframes dshm-leave { to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; transform: translateY(-3px); } }
@@ -530,6 +510,7 @@ blockquote.dshm-review {
 @keyframes dshm-turn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dshm-unfold { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 @keyframes dshm-pop { from { opacity: 0; transform: scale(.3); } to { opacity: 1; transform: scale(1); } }
+@keyframes dshm-spin { to { transform: rotate(360deg); } }
 @keyframes dshm-ink-in { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: none; } }
 @keyframes dshm-inkbar { 0% { top: 0; opacity: 0; } 15% { opacity: .8; } 85% { opacity: .8; } 100% { top: 62%; opacity: 0; } }
 
