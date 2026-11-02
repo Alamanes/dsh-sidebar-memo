@@ -3,10 +3,9 @@
 // hand because a plugin does not import the harness packages.
 //
 // A bookkeeping call should not pay for deliberation, so the effort starts at the
-// lowest the model offers (efforts[0]). A model that answers nothing at that
-// level — a thinking-only reply, or an adapter that accepts the effort and then
-// emits no text — is asked again at the session level and then at the provider
-// default, and the working level is kept for the rest of the process.
+// lowest the model offers (efforts[0]). A model that fails or answers nothing at
+// that level is asked again at the provider default, and the working level is
+// kept for the rest of the process.
 
 const CALL_TIMEOUT_MS = 120_000
 
@@ -34,7 +33,7 @@ export function routeOf(ctx) {
 }
 
 /** The host reports a finish reason as a string in older builds and as
- *  `{ kind }` in newer ones; both spellings reach the same comparisons. */
+ *  `{ kind, failure }` in newer ones. */
 function finishKind(reason) {
   if (typeof reason === 'string') return reason
   if (reason !== null && typeof reason === 'object') {
@@ -44,8 +43,20 @@ function finishKind(reason) {
   return ''
 }
 
-/** Set once the lowest level has answered nothing; later calls skip straight
- *  to the provider default instead of paying for another empty round. */
+function failureText(failure, finish) {
+  if (failure === undefined || failure === null) return '模型调用失败（' + finish + '）'
+  if (typeof failure === 'string') return failure
+  const message = failure.message ?? failure.detail ?? failure.code
+  if (typeof message === 'string' && message !== '') return message
+  try {
+    return JSON.stringify(failure)
+  } catch {
+    return '模型调用失败（' + finish + '）'
+  }
+}
+
+/** Set once the lowest level has failed; later calls skip straight to the
+ *  provider default instead of paying for another broken round. */
 let effortBroken = false
 
 async function leastEffort(llm, route) {
@@ -91,11 +102,12 @@ export async function askOnce(ctx, { system, text, maxTokens = 4_096, warn = () 
         if (chunk?.type === 'text-delta' && typeof chunk.text === 'string') reply += chunk.text
         else if (chunk?.type === 'finish') {
           finish = finishKind(chunk.reason)
-          failure = chunk.failure
+          const reason = chunk.reason
+          failure = chunk.failure ?? (reason !== null && typeof reason === 'object' ? reason.failure : undefined)
         }
       }
       if (finish === 'error' || finish === 'aborted') {
-        throw new Error(String(failure?.message ?? failure ?? finish))
+        throw new Error(failureText(failure, finish))
       }
       const trimmed = reply.trim()
       if (trimmed !== '') return { text: trimmed, finish: finish || 'stop' }
@@ -108,7 +120,19 @@ export async function askOnce(ctx, { system, text, maxTokens = 4_096, warn = () 
     return { text: '', finish: 'max-tokens' }
   }
 
-  const first = await attempt(effort)
+  /** Retry once at the provider default when the chosen level breaks. */
+  const run = async (reasoningEffort) => {
+    try {
+      return await attempt(reasoningEffort)
+    } catch (error) {
+      if (reasoningEffort === undefined) throw error
+      warn('dsh-sidebar-memo: effort "' + String(reasoningEffort) + '" failed: ' + String(error?.message ?? error))
+      effortBroken = true
+      return attempt(undefined)
+    }
+  }
+
+  const first = await run(effort)
   if (first.text !== '') return first.text
 
   warn('dsh-sidebar-memo: effort "' + String(effort) + '" produced no text (' + first.finish + ')')
