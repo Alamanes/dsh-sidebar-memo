@@ -23,11 +23,13 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./locale/*": "./locale/*",
     "./package.json": "./package.json"
   },
   "files": [
     "src",
     "lib",
+    "locale",
     "icon.png",
     "cordis.patch.yml",
     "README.md"
